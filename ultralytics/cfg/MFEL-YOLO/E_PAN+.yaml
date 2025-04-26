@@ -1,0 +1,43 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# YOLOv8 object detection model with P2-P5 outputs. For Usage examples see https://docs.ultralytics.com/tasks/detect
+
+# Parameters
+nc: 10 # number of classes
+scales: # model compound scaling constants, i.e. 'model=yolov8n.yaml' will call yolov8.yaml with scale 'n'
+ m: [0.67, 0.75, 768]
+#  l: [1.00, 1.00, 512]
+#  x: [1.00, 1.25, 512]
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]] # 0-P1/2
+  - [-1, 1, Conv, [128, 3, 2]] # 1-P2/4
+  - [-1, 3, C2f, [128, True]] # 160*160
+  - [-1, 1, Conv, [256, 3, 2]] # 3-P3/8
+  - [-1, 6, C2f, [256, True]] # 80*80
+  - [-1, 1, Conv, [512, 3, 2]] # 5-P4/16
+  - [-1, 3, C2f, [512, True]] # 40*40
+  - [-1, 1, SPPF, [512, 5]] # 7
+
+# YOLOv8.0-p2 head
+head:
+  - [[-1, -2], 1, td_lhfusion, ['p4']] # cat backbone P4
+  - [-1, 1, C2f, [512]] # 9
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 4], 1, td_lhfusion, ['p3']] # cat backbone P3
+  - [-1, 3, C2f, [256]] # 12 (P3/8-small)
+
+    ###  下面 进行 改变  --------------------------------------------------------
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 2], 1, td_lhfusion, ['p2']] # cat backbone P2
+  - [-1, 6, C2f, [128]] # 15 (P2/4-xsmall)
+
+  - [-1, 1, Conv, [256, 3, 2]]
+  - [[-1, 12], 1, bu_lhfusion, [2]] # cat head P3
+  - [-1, 1, C2f, [256]] # 18 (P3/8-small)
+### ---------------------截至 ------------------- 新加的  -------------------------
+  - [-1, 1, Conv, [512, 3, 2]]
+  - [[-1, 9], 1, bu_lhfusion, [4,5,'avg_pool',0.2]] # cat head P4
+  - [-1, 1, C2f, [512]] # 21 (P4/16-medium)
+
+  - [[15, 18, 21], 1, Detect, [nc]] # Detect(P2, P3, P4)
